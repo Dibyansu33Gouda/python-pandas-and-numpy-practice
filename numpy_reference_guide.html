@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NumPy Reference — Contiguous</title>
+<style>
+:root{
+  --bg:#0B1120;
+  --panel:#111A2E;
+  --panel-hi:#16223B;
+  --line:#233252;
+  --text:#E4E9F2;
+  --muted:#8B95AB;
+  --cyan:#5EEAD4;
+  --cyan-dim:#1F4A47;
+  --amber:#F0A85A;
+  --violet:#A78BFA;
+  --mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", Consolas, monospace;
+  --sans: -apple-system, "Segoe UI", ui-sans-serif, Arial, sans-serif;
+}
+*{box-sizing:border-box;}
+body{
+  margin:0; background:var(--bg); color:var(--text);
+  font-family:var(--sans); line-height:1.55;
+}
+::selection{background:var(--cyan-dim); color:var(--cyan);}
+
+/* ---------- HERO ---------- */
+.hero{
+  padding:64px 24px 40px; text-align:center; position:relative;
+  border-bottom:1px solid var(--line);
+  background:
+    radial-gradient(600px 300px at 50% -10%, rgba(94,234,212,.08), transparent 70%);
+}
+.eyebrow{
+  font-family:var(--mono); font-size:12px; letter-spacing:.15em; color:var(--cyan);
+  text-transform:uppercase; margin-bottom:14px;
+}
+.hero h1{
+  font-size:clamp(28px,5vw,46px); margin:0 0 10px; font-weight:800; letter-spacing:-.02em;
+}
+.hero p.sub{ color:var(--muted); max-width:560px; margin:0 auto 32px; font-size:15px;}
+
+/* memory grid animation: contiguous (numpy) vs scattered (python list) */
+.memviz{
+  display:flex; gap:36px; justify-content:center; flex-wrap:wrap; margin-top:8px;
+}
+.memblock{ width:260px; }
+.memblock h3{
+  font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:.1em;
+  color:var(--muted); margin:0 0 10px; font-weight:600;
+}
+.grid{
+  display:grid; grid-template-columns:repeat(8,1fr); gap:4px;
+  background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px;
+  height:96px;
+}
+.cell{ border-radius:3px; background:#1B2740; transition:background .25s, transform .25s; }
+.cell.lit{ background:var(--cyan); box-shadow:0 0 8px rgba(94,234,212,.6);}
+.cell.litamber{ background:var(--amber); box-shadow:0 0 8px rgba(240,168,90,.6); transform:scale(1.06);}
+.caption{ font-size:12px; color:var(--muted); margin-top:8px;}
+
+/* ---------- FILTER BAR ---------- */
+.filterbar{
+  position:sticky; top:0; z-index:20; background:rgba(11,17,32,.92); backdrop-filter:blur(6px);
+  border-bottom:1px solid var(--line); padding:14px 24px; display:flex; gap:10px;
+  justify-content:center; flex-wrap:wrap;
+}
+.filter-btn{
+  font-family:var(--mono); font-size:12px; padding:8px 16px; border-radius:999px;
+  border:1px solid var(--line); background:var(--panel); color:var(--muted); cursor:pointer;
+  transition:all .15s; letter-spacing:.03em;
+}
+.filter-btn:hover{ color:var(--text); border-color:var(--cyan);}
+.filter-btn.active{ background:var(--cyan); color:#06231F; border-color:var(--cyan); font-weight:700;}
+
+/* ---------- LAYOUT ---------- */
+main{ max-width:920px; margin:0 auto; padding:40px 24px 100px; }
+.section{
+  margin-bottom:20px; background:var(--panel); border:1px solid var(--line); border-radius:12px;
+  padding:26px 28px; opacity:0; transform:translateY(14px); transition:opacity .5s, transform .5s;
+}
+.section.show{ opacity:1; transform:translateY(0); }
+.section.hide-filtered{ display:none; }
+.section-head{ display:flex; align-items:center; gap:12px; margin-bottom:6px; flex-wrap:wrap;}
+.badge{
+  font-family:var(--mono); font-size:10px; padding:3px 9px; border-radius:5px; letter-spacing:.06em;
+  text-transform:uppercase; font-weight:700;
+}
+.badge.beginner{ background:var(--cyan-dim); color:var(--cyan);}
+.badge.intermediate{ background:#3A2E5C; color:var(--violet);}
+.badge.advanced{ background:#4A2E1F; color:var(--amber);}
+.num{ font-family:var(--mono); color:var(--muted); font-size:13px;}
+.section h2{ font-size:19px; margin:2px 0 12px; font-weight:700;}
+.section p{ color:#C3CBDC; font-size:14.5px; margin:0 0 14px;}
+.section p.new-tag{
+  display:inline-block; font-family:var(--mono); font-size:10px; color:var(--amber);
+  border:1px solid #4A2E1F; padding:2px 8px; border-radius:4px; margin-bottom:10px;
+}
+
+table{ width:100%; border-collapse:collapse; font-size:13.5px; margin-bottom:14px;}
+th,td{ text-align:left; padding:8px 10px; border-bottom:1px solid var(--line); vertical-align:top;}
+th{ color:var(--muted); font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:.04em;}
+td code, li code{
+  font-family:var(--mono); background:var(--panel-hi); padding:1px 5px; border-radius:4px; font-size:12.5px; color:var(--cyan);
+}
+
+pre{
+  position:relative; background:#0D1526; border:1px solid var(--line); border-radius:8px;
+  padding:16px 18px; overflow-x:auto; font-family:var(--mono); font-size:13px; margin:0 0 14px;
+}
+pre code{ color:#D6DEEF; }
+.tok-c{ color:#6B7A99;} .tok-k{ color:var(--violet);} .tok-s{ color:var(--amber);} .tok-f{ color:var(--cyan);}
+.copy-btn{
+  position:absolute; top:8px; right:8px; font-family:var(--mono); font-size:10px;
+  background:var(--panel); border:1px solid var(--line); color:var(--muted);
+  padding:3px 8px; border-radius:5px; cursor:pointer;
+}
+.copy-btn:hover{ color:var(--cyan); border-color:var(--cyan);}
+
+ul.tight{ margin:0 0 14px; padding-left:18px; font-size:14px; color:#C3CBDC;}
+ul.tight li{ margin-bottom:5px; }
+
+/* ---------- INTERACTIVE DEMOS ---------- */
+.demo{
+  background:var(--panel-hi); border:1px dashed var(--line); border-radius:8px; padding:16px; margin-top:6px;
+}
+.demo-label{ font-family:var(--mono); font-size:11px; color:var(--cyan); text-transform:uppercase; letter-spacing:.06em; margin-bottom:10px;}
+.bc-row{ display:flex; gap:6px; align-items:center; margin-bottom:8px; font-family:var(--mono); font-size:13px;}
+.bc-cell{ width:34px; height:34px; display:flex; align-items:center; justify-content:center; border-radius:5px; background:#1B2740; transition:background .3s, transform .3s;}
+.bc-cell.pulse{ background:var(--cyan); color:#06231F; transform:scale(1.12);}
+.bc-plus{ color:var(--muted);}
+.run-btn{
+  font-family:var(--mono); font-size:12px; background:var(--cyan); color:#06231F; border:none;
+  padding:7px 14px; border-radius:6px; cursor:pointer; font-weight:700; margin-top:6px;
+}
+.run-btn:hover{ filter:brightness(1.08);}
+.speed-bars{ display:flex; align-items:flex-end; gap:16px; height:100px; margin-top:14px;}
+.speed-bar{ width:60px; background:var(--violet); border-radius:4px 4px 0 0; position:relative; transition:height 1s cubic-bezier(.2,.9,.3,1); height:0;}
+.speed-bar.loop{ background:var(--amber);}
+.speed-bar span{ position:absolute; top:-20px; left:0; right:0; text-align:center; font-family:var(--mono); font-size:11px; color:var(--muted);}
+.speed-labels{ display:flex; gap:16px; margin-top:6px;}
+.speed-labels div{ width:60px; text-align:center; font-family:var(--mono); font-size:10px; color:var(--muted);}
+
+footer{ text-align:center; padding:40px 24px; color:var(--muted); font-family:var(--mono); font-size:12px; border-top:1px solid var(--line);}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="eyebrow">Study Guide · Beginner → Advanced</div>
+  <h1>NumPy, Contiguous</h1>
+  <p class="sub">The same 24 numbers, laid out two ways. Watch the memory access pattern — this is the entire reason NumPy exists.</p>
+  <div class="memviz">
+    <div class="memblock">
+      <h3>Python list — scattered pointers</h3>
+      <div class="grid" id="gridList"></div>
+      <div class="caption">Each access jumps to a random address</div>
+    </div>
+    <div class="memblock">
+      <h3>NumPy array — contiguous block</h3>
+      <div class="grid" id="gridNumpy"></div>
+      <div class="caption">Sequential read — cache-friendly, SIMD-ready</div>
+    </div>
+  </div>
+</div>
+
+<div class="filterbar" id="filterbar">
+  <button class="filter-btn active" data-level="all">All levels</button>
+  <button class="filter-btn" data-level="beginner">Beginner</button>
+  <button class="filter-btn" data-level="intermediate">Intermediate</button>
+  <button class="filter-btn" data-level="advanced">Advanced</button>
+</div>
+
+<main id="sections"></main>
+
+<footer>Rebuilt from your Drive doc · gaps filled at Intermediate &amp; Advanced tiers</footer>
+
+<script>
+/* ---------------- memory grid intro animation ---------------- */
+function buildGrid(id){
+  const g = document.getElementById(id);
+  for(let i=0;i<24;i++){ const c=document.createElement('div'); c.className='cell'; g.appendChild(c); }
+  return [...g.children];
+}
+const listCells = buildGrid('gridList');
+const numpyCells = buildGrid('gridNumpy');
+
+function animateContiguous(){
+  numpyCells.forEach(c=>c.classList.remove('lit'));
+  let i=0;
+  const iv = setInterval(()=>{
+    if(i>0) numpyCells[i-1].classList.remove('lit');
+    if(i<numpyCells.length){ numpyCells[i].classList.add('lit'); i++; }
+    else { clearInterval(iv); setTimeout(animateContiguous, 900); }
+  }, 55);
+}
+function animateScattered(){
+  listCells.forEach(c=>c.classList.remove('litamber'));
+  const order = [...Array(24).keys()].sort(()=>Math.random()-0.5);
+  let i=0;
+  const iv = setInterval(()=>{
+    if(i>0) listCells[order[i-1]].classList.remove('litamber');
+    if(i<order.length){ listCells[order[i]].classList.add('litamber'); i++; }
+    else { clearInterval(iv); setTimeout(animateScattered, 900); }
+  }, 55);
+}
+animateContiguous();
+animateScattered();
+
+/* ---------------- content data ---------------- */
+const sections = [
+{level:'beginner', num:'01', title:'Why NumPy over Python Lists?', isNew:false,
+ body:`<p>Python lists store <b>pointers</b> to scattered objects, each carrying type + refcount + size overhead. NumPy stores raw, fixed-width values in one contiguous memory block — enabling SIMD vectorization and full CPU cache utilization.</p>
+ <table><tr><th>Feature</th><th>Python List</th><th>NumPy Array</th></tr>
+ <tr><td>Storage</td><td>Scattered pointers to objects</td><td>Contiguous raw bytes</td></tr>
+ <tr><td>Typing</td><td>Heterogeneous, dynamic</td><td>Homogeneous, fixed (int32, float64…)</td></tr>
+ <tr><td>Speed</td><td>Type-checked per element</td><td>Vectorized, cache-friendly</td></tr></table>`},
+
+{level:'beginner', num:'02', title:'Array Creation & Inspection', isNew:false,
+ body:`<pre><code><span class="tok-k">import</span> numpy <span class="tok-k">as</span> np
+
+a = np.array([1, 2, 3], dtype=<span class="tok-s">'int16'</span>)
+b = np.array([[9.0, 8.0, 7.0], [6.0, 5.0, 4.0]])
+
+a.ndim      <span class="tok-c"># 1  — number of dimensions</span>
+b.shape     <span class="tok-c"># (2, 3) — rows, columns</span>
+a.dtype     <span class="tok-c"># dtype('int16')</span>
+a.itemsize  <span class="tok-c"># 2  — bytes per element</span>
+a.size      <span class="tok-c"># 3  — total elements</span>
+a.nbytes    <span class="tok-c"># 6  — itemsize * size</span></code></pre>`},
+
+{level:'beginner', num:'03', title:'Indexing & Slicing', isNew:false,
+ body:`<p>Pattern: <code>arr[row_start:row_end:step, col_start:col_end:step]</code></p>
+ <table><tr><th>Operation</th><th>Syntax</th></tr>
+ <tr><td>Specific element</td><td><code>arr[1, 5]</code></td></tr>
+ <tr><td>Entire row</td><td><code>arr[0, :]</code></td></tr>
+ <tr><td>Entire column</td><td><code>arr[:, 2]</code></td></tr>
+ <tr><td>Stepped slice</td><td><code>arr[0, 1:6:2]</code></td></tr>
+ <tr><td>Bulk assignment</td><td><code>arr[:, 2] = [1, 2]</code></td></tr></table>`},
+
+{level:'beginner', num:'04', title:'Array Creation Routines', isNew:false,
+ body:`<ul class="tight">
+ <li><code>np.zeros((r,c))</code> — filled with 0.0</li>
+ <li><code>np.ones((r,c,d), dtype='int32')</code> — filled with 1.0</li>
+ <li><code>np.full((r,c), val)</code> — filled with a constant</li>
+ <li><code>np.full_like(arr, val)</code> — matches shape of an existing array</li>
+ <li><code>np.random.rand(r,c)</code> — uniform floats in [0,1)</li>
+ <li><code>np.random.randint(lo, hi, size=(r,c))</code> — random ints</li>
+ <li><code>np.identity(n)</code> — n×n identity matrix</li>
+ <li><code>np.repeat(arr, n, axis=0)</code> — repeats elements</li>
+ </ul>`},
+
+{level:'beginner', num:'05', title:'The Copy Pitfall', isNew:false,
+ body:`<p><b>Assignment does not clone.</b> <code>b = a</code> hands out a second name for the same memory.</p>
+ <pre><code>a = np.array([1, 2, 3])
+b = a           <span class="tok-c"># reference — mutating b mutates a!</span>
+c = a.copy()    <span class="tok-c"># independent — safe</span></code></pre>`},
+
+{level:'intermediate', num:'06', title:'Element-wise Math & Linear Algebra', isNew:false,
+ body:`<table><tr><th>Category</th><th>Function</th></tr>
+ <tr><td>Arithmetic</td><td><code>arr + 2</code>, <code>arr * 3</code>, <code>arr ** 2</code></td></tr>
+ <tr><td>Trig</td><td><code>np.sin(arr)</code>, <code>np.cos(arr)</code></td></tr>
+ <tr><td>Matrix multiply</td><td><code>np.matmul(a, b)</code></td></tr>
+ <tr><td>Determinant</td><td><code>np.linalg.det(arr)</code></td></tr></table>`},
+
+{level:'intermediate', num:'07', title:'Statistics & Reshaping', isNew:false,
+ body:`<pre><code>stats = np.array([[1,2,3],[4,5,6]])
+
+np.min(stats, axis=1)   <span class="tok-c"># [1, 4]  — row-wise</span>
+np.sum(stats, axis=0)   <span class="tok-c"># [5,7,9] — column-wise</span>
+
+after = stats.reshape((3,2))
+np.vstack([a1, a2])     <span class="tok-c"># stack rows</span>
+np.hstack([a1, a2])     <span class="tok-c"># stack columns</span></code></pre>`},
+
+{level:'intermediate', num:'08', title:'Boolean Masking & Fancy Indexing', isNew:false,
+ body:`<pre><code>filedata = np.genfromtxt(<span class="tok-s">'data.txt'</span>, delimiter=<span class="tok-s">','</span>).astype(<span class="tok-s">'int32'</span>)
+
+filedata > 50                 <span class="tok-c"># boolean mask, same shape</span>
+filedata[filedata > 50]       <span class="tok-c"># filtered values</span>
+np.any(filedata > 50, axis=0)
+np.all(filedata > 50, axis=0)
+arr[[0, 1, 8]]                <span class="tok-c"># fancy indexing — pick discrete rows</span></code></pre>`},
+
+{level:'intermediate', num:'09', title:'Broadcasting Rules', isNew:true,
+ body:`<p>This is the concept the original guide used constantly (<code>arr + 2</code>) but never explained. Broadcasting lets arrays of <b>different shapes</b> combine without manual loops, by virtually stretching the smaller one. Two dimensions are compatible if they're equal, or one of them is 1.</p>
+ <div class="demo">
+  <div class="demo-label">Live: shape (3,) + shape (1,) → stretched to (3,)</div>
+  <div class="bc-row" id="bcA"></div>
+  <div class="bc-row"><span class="bc-plus" style="width:34px;text-align:center;">+</span></div>
+  <div class="bc-row" id="bcB"></div>
+  <div class="bc-row" id="bcResult"></div>
+  <button class="run-btn" onclick="runBroadcast()">Run broadcast</button>
+ </div>`},
+
+{level:'intermediate', num:'10', title:'Sorting, Uniques & Conditional Select', isNew:true,
+ body:`<pre><code>arr = np.array([5, 1, 4, 2, 4])
+
+np.sort(arr)              <span class="tok-c"># [1,2,4,4,5]</span>
+np.argsort(arr)           <span class="tok-c"># indices that would sort it</span>
+np.unique(arr)            <span class="tok-c"># [1,2,4,5] — no duplicates</span>
+np.where(arr > 3, 1, 0)   <span class="tok-c"># conditional replace, vectorized if/else</span></code></pre>
+ <p>Also missing from the original: <code>np.arange(0,10,2)</code> and <code>np.linspace(0,1,5)</code> for generating sequences, and <code>np.concatenate([a,b], axis=0)</code> as the general form of vstack/hstack.</p>`},
+
+{level:'advanced', num:'11', title:'Strides & Views vs. Copies', isNew:true,
+ body:`<p>Slicing (<code>arr[1:4]</code>) returns a <b>view</b> — same underlying buffer, different <code>strides</code> (bytes to jump per axis). Fancy/boolean indexing always returns a <b>copy</b>. Knowing which one you have prevents silent bugs at scale.</p>
+ <pre><code>a = np.arange(12).reshape(3,4)
+a.strides            <span class="tok-c"># (32, 8) — bytes to next row / next col</span>
+v = a[1:, :]          <span class="tok-c"># view — shares memory with a</span>
+v.base is a           <span class="tok-c"># True</span>
+c = a[a > 5]           <span class="tok-c"># copy — boolean indexing always copies</span>
+c.base is a            <span class="tok-c"># False</span></code></pre>`},
+
+{level:'advanced', num:'12', title:'Vectorization vs. Python Loops', isNew:true,
+ body:`<p>The real payoff of everything above: replacing an explicit loop with an array op. Same result, order-of-magnitude difference in wall-clock time on large arrays.</p>
+ <pre><code>n = 1_000_000
+a = np.arange(n)
+
+<span class="tok-c"># slow — Python-level loop</span>
+out = [x*2 for x in a]
+
+<span class="tok-c"># fast — vectorized, runs in compiled C</span>
+out = a * 2</code></pre>
+ <div class="demo">
+  <div class="demo-label">Relative time for 1M elements ×2 (illustrative)</div>
+  <div class="speed-bars">
+    <div class="speed-bar loop" id="barLoop"><span id="barLoopLabel"></span></div>
+    <div class="speed-bar" id="barVec"><span id="barVecLabel"></span></div>
+  </div>
+  <div class="speed-labels"><div>Python loop</div><div>NumPy vector</div></div>
+  <button class="run-btn" onclick="runSpeedDemo()">Benchmark</button>
+ </div>`},
+
+{level:'advanced', num:'13', title:'np.einsum for Tensor Ops', isNew:true,
+ body:`<p>One notation for dot products, matrix multiply, transposes, and batched contractions — express the operation, let NumPy pick the fast path.</p>
+ <pre><code>np.einsum(<span class="tok-s">'ij,jk->ik'</span>, A, B)   <span class="tok-c"># == A @ B</span>
+np.einsum(<span class="tok-s">'ii->i'</span>, A)          <span class="tok-c"># diagonal of A</span>
+np.einsum(<span class="tok-s">'ij->ji'</span>, A)          <span class="tok-c"># transpose</span></code></pre>`},
+
+{level:'advanced', num:'14', title:'Structured Arrays', isNew:true,
+ body:`<p>When rows have mixed types (name, age, score) — a NumPy array of records instead of reaching for pandas.</p>
+ <pre><code>dt = np.dtype([(<span class="tok-s">'name'</span>,<span class="tok-s">'U10'</span>), (<span class="tok-s">'age'</span>,<span class="tok-s">'i4'</span>)])
+people = np.array([(<span class="tok-s">'Ana'</span>,25), (<span class="tok-s">'Rio'</span>,31)], dtype=dt)
+people[<span class="tok-s">'age'</span>]   <span class="tok-c"># array([25, 31])</span></code></pre>`},
+
+{level:'advanced', num:'15', title:'Saving, Loading & Memory-Mapping', isNew:true,
+ body:`<pre><code>np.save(<span class="tok-s">'arr.npy'</span>, a)
+b = np.load(<span class="tok-s">'arr.npy'</span>)
+
+np.savez(<span class="tok-s">'bundle.npz'</span>, x=a, y=b)     <span class="tok-c"># multiple arrays, one file</span>
+
+<span class="tok-c"># dataset bigger than RAM — read from disk on demand</span>
+big = np.memmap(<span class="tok-s">'big.dat'</span>, dtype=<span class="tok-s">'float32'</span>, mode=<span class="tok-s">'r'</span>, shape=(10**8,))</code></pre>`},
+
+{level:'advanced', num:'16', title:'meshgrid & the Modern Random API', isNew:true,
+ body:`<pre><code><span class="tok-c"># evaluate a function over a 2D grid, vectorized</span>
+x, y = np.meshgrid(np.linspace(-2,2,5), np.linspace(-2,2,5))
+z = x**2 + y**2
+
+<span class="tok-c"># preferred over legacy np.random.rand / randint since NumPy 1.17</span>
+rng = np.random.default_rng(seed=42)
+rng.integers(0, 10, size=(3,3))
+rng.normal(loc=0, scale=1, size=5)</code></pre>`},
+];
+
+/* ---------------- render ---------------- */
+const container = document.getElementById('sections');
+sections.forEach((s,idx)=>{
+  const el = document.createElement('div');
+  el.className = 'section';
+  el.dataset.level = s.level;
+  el.innerHTML = `
+    <div class="section-head">
+      <span class="num">${s.num}</span>
+      <span class="badge ${s.level}">${s.level}</span>
+      ${s.isNew ? '<span class="badge" style="background:#1F2E4A;color:#8FB8FF;">added — gap fill</span>' : ''}
+    </div>
+    <h2>${s.title}</h2>
+    ${s.body}
+  `;
+  container.appendChild(el);
+});
+
+/* copy buttons */
+container.querySelectorAll('pre').forEach(pre=>{
+  const btn = document.createElement('button');
+  btn.className='copy-btn'; btn.textContent='copy';
+  btn.onclick = ()=>{
+    navigator.clipboard.writeText(pre.innerText).then(()=>{
+      btn.textContent='copied'; setTimeout(()=>btn.textContent='copy',1200);
+    });
+  };
+  pre.appendChild(btn);
+});
+
+/* reveal-on-scroll */
+const io = new IntersectionObserver((entries)=>{
+  entries.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('show'); io.unobserve(e.target);} });
+},{threshold:0.1});
+container.querySelectorAll('.section').forEach(s=>io.observe(s));
+
+/* filter bar */
+document.getElementById('filterbar').addEventListener('click',(e)=>{
+  const btn = e.target.closest('.filter-btn');
+  if(!btn) return;
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const lvl = btn.dataset.level;
+  container.querySelectorAll('.section').forEach(sec=>{
+    const match = (lvl==='all' || sec.dataset.level===lvl);
+    sec.classList.toggle('hide-filtered', !match);
+  });
+});
+
+/* broadcasting demo */
+function buildBcCells(id, vals){
+  const row = document.getElementById(id); row.innerHTML='';
+  vals.forEach(v=>{
+    const c = document.createElement('div'); c.className='bc-cell'; c.textContent=v;
+    row.appendChild(c);
+  });
+  return [...row.children];
+}
+buildBcCells('bcA', [1,2,3]);
+buildBcCells('bcB', [10]);
+buildBcCells('bcResult', ['?','?','?']);
+
+function runBroadcast(){
+  const A = buildBcCells('bcA', [1,2,3]);
+  const B = buildBcCells('bcB', [10]);
+  const R = buildBcCells('bcResult', ['','','']);
+  let i=0;
+  const iv = setInterval(()=>{
+    if(i>0){ A[i-1].classList.remove('pulse'); B[0].classList.remove('pulse'); }
+    if(i<3){
+      A[i].classList.add('pulse'); B[0].classList.add('pulse');
+      setTimeout(()=>{ R[i].textContent = 1*[1,2,3][i]===undefined?'':(([1,2,3][i]+10)); R[i].classList.add('pulse'); },250);
+      i++;
+    } else { clearInterval(iv); }
+  }, 650);
+}
+
+/* vectorization speed demo (illustrative bars) */
+function runSpeedDemo(){
+  const loop = document.getElementById('barLoop');
+  const vec = document.getElementById('barVec');
+  const loopLabel = document.getElementById('barLoopLabel');
+  const vecLabel = document.getElementById('barVecLabel');
+  loop.style.height='0px'; vec.style.height='0px';
+  loopLabel.textContent=''; vecLabel.textContent='';
+  requestAnimationFrame(()=>{
+    setTimeout(()=>{ loop.style.height='96px'; loopLabel.textContent='~0.09s'; },50);
+    setTimeout(()=>{ vec.style.height='6px'; vecLabel.textContent='~0.002s'; },50);
+  });
+}
+</script>
+</body>
+</html>
