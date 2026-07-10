@@ -16,7 +16,7 @@ DateTopicNotes2026-07-01Pandas basicsDataFrames, .loc vs .iloc, boolean filterin
 
 (Add a new row here every time you push — takes 10 seconds and gives you a scrollable history of everything you've learned.)
 
-🎯 Why this repo exists
+🎯 Why this repo exists......
 
 
 Keep the GitHub streak alive on days I'm not shipping a full project
